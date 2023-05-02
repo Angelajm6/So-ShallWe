@@ -1,55 +1,141 @@
-const { Course, Student } = require('../models');
+// Import the Thought and User models from "../models"
+const { Thought, User } = require("../models");
 
-module.exports = {
-  // Get all courses
-  getCourses(req, res) {
-    Course.find()
-      .then((courses) => res.json(courses))
-      .catch((err) => res.status(500).json(err));
-  },
-  // Get a course
-  getSingleCourse(req, res) {
-    Course.findOne({ _id: req.params.courseId })
-      .select('-__v')
-      .then((course) =>
-        !course
-          ? res.status(404).json({ message: 'No course with that ID' })
-          : res.json(course)
-      )
-      .catch((err) => res.status(500).json(err));
-  },
-  // Create a course
-  createCourse(req, res) {
-    Course.create(req.body)
-      .then((course) => res.json(course))
+// Define the thought controller object
+const thoughtController = {
+
+  getAllThoughts(req, res) {
+    
+    Thought.find({})
+      .populate({
+        path: "reactions",
+        select: "-__v",
+      })
+      .select("-__v") 
+      .sort({ _id: -1 }) 
+      .then((dbThoughtData) => res.json(dbThoughtData))
       .catch((err) => {
         console.log(err);
-        return res.status(500).json(err);
+        res.sendStatus(400);
       });
   },
-  // Delete a course
-  deleteCourse(req, res) {
-    Course.findOneAndDelete({ _id: req.params.courseId })
-      .then((course) =>
-        !course
-          ? res.status(404).json({ message: 'No course with that ID' })
-          : Student.deleteMany({ _id: { $in: course.students } })
-      )
-      .then(() => res.json({ message: 'Course and students deleted!' }))
-      .catch((err) => res.status(500).json(err));
+
+  // Get one thought by id
+  getThoughtById({ params }, res) {
+    // Find a thought by its _id field and populate its reactions with their respective data except the __v field
+    Thought.findOne({ _id: params.id })
+      .populate({
+        path: "reactions",
+        select: "-__v",
+      })
+      .select("-__v") // Exclude the __v field from the thought
+      .then((dbThoughtData) => {
+        if (!dbThoughtData) {
+          return res.status(404).json({ message: "No thought with this id!" });
+        }
+        res.json(dbThoughtData);
+      })
+      .catch((err) => {
+        console.log(err);
+        res.sendStatus(400);
+      });
   },
-  // Update a course
-  updateCourse(req, res) {
-    Course.findOneAndUpdate(
-      { _id: req.params.courseId },
-      { $set: req.body },
-      { runValidators: true, new: true }
-    )
-      .then((course) =>
-        !course
-          ? res.status(404).json({ message: 'No course with this id!' })
-          : res.json(course)
-      )
-      .catch((err) => res.status(500).json(err));
+
+  // Create thought
+  createThought({ params, body }, res) {
+    // Create a new thought with the given data
+    Thought.create(body)
+      .then((dbThoughtData) => {
+        // Add the created thought's _id to the associated user's thoughts array field
+        return User.findOneAndUpdate(
+          { username: dbThoughtData.username },
+          { $push: { thoughts: dbThoughtData._id } },
+          { new: true }
+        );
+      })
+      .then((dbUserData) => {
+        console.log(dbUserData);
+        if (!dbUserData) {
+          return res
+            .status(404)
+            .json({ message: "Thought created but no user with this id!" });
+        }
+
+        res.json({ message: "Thought successfully created!" });
+      })
+      .catch((err) => res.json(err));
   },
+
+  // Update thought by id
+  updateThought({ params, body }, res) {
+  
+    Thought.findOneAndUpdate({ _id: params.id }, body, {
+      new: true, 
+      runValidators: true, 
+    })
+      .then((dbThoughtData) => {
+        if (!dbThoughtData) {
+          res.status(404).json({ message: "No thought found with this id!" });
+          return;
+        }
+        res.json(dbThoughtData);
+      })
+      .catch((err) => res.json(err));
+  },
+
+ // delete Thought
+ deleteThought({ params }, res) {
+  Thought.findOneAndDelete({ _id: params.id })
+    .then((dbThoughtData) => {
+      if (!dbThoughtData) {
+        return res.status(404).json({ message: "No thought with this id!" });
+      }
+
+    
+      return User.findOneAndUpdate(
+        { thoughts: params.id },
+        { $pull: { thoughts: params.id } }, 
+        { new: true }
+      );
+    })
+    .then((dbUserData) => {
+      if (!dbUserData) {
+        return res
+          .status(404)
+          .json({ message: "Thought created but no user with this id!" });
+      }
+      res.json({ message: "Thought successfully deleted!" });
+    })
+    .catch((err) => res.json(err));
+},
+
+// add reaction
+addReaction({ params, body }, res) {
+  Thought.findOneAndUpdate(
+    { _id: params.thoughtId },
+    { $addToSet: { reactions: body } },
+    { new: true, runValidators: true }
+  )
+    .then((dbThoughtData) => {
+      if (!dbThoughtData) {
+        res.status(404).json({ message: "No thought with this id" });
+        return;
+      }
+      res.json(dbThoughtData);
+    })
+    .catch((err) => res.json(err));
+},
+
+// delete reaction
+removeReaction({ params }, res) {
+  Thought.findOneAndUpdate(
+    { _id: params.thoughtId },
+    { $pull: { reactions: { reactionId: params.reactionId } } },
+    { new: true }
+  )
+    .then((dbThoughtData) => res.json(dbThoughtData))
+    .catch((err) => res.json(err));
+},
 };
+
+module.exports = thoughtController;
