@@ -2,7 +2,7 @@
 const { User, Thought } = require("../models");
 
 module.exports = {
-  getThought(req, res) {
+  getAllThoughts(req, res) {
     Thought.find({})
       .then((thought) => res.json(thought))
       .catch((err) => res.status(500).json(err));
@@ -69,7 +69,7 @@ module.exports = {
       .catch((err) => res.status(500).json(err));
   },
 
-  createReaction(req, res) {
+  addReaction(req, res) {
     Thought.findOneAndUpdate(
       { _id: req.params.thoughtId },
       { $addToSet: { reactions: req.body } },
@@ -83,7 +83,7 @@ module.exports = {
       .catch((err) => res.status(500).json(err));
   },
 
-  deleteReaction(req, res) {
+  removeReaction(req, res) {
     Thought.findOneAndUpdate(
       { _id: req.params.thoughtId },
       { $pull: { reactions: { reactionId: req.params.reactionId } } },
