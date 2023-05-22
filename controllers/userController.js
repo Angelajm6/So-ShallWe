@@ -10,7 +10,7 @@ module.exports = {
         .then((users) => res.json(users))
         .catch((err) => res.status(500).json(err));
     },
-    getSingleUser(req, res) {
+    getUserById(req, res) {
       User.findOne({ _id: req.params.userId })
         .populate({ path: 'thoughts', select: '-__v' })
         .populate({ path: 'friends', select: '-__v' })
